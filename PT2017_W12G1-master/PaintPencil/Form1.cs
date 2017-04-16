@@ -14,13 +14,21 @@ namespace PaintPencil
 {
     public partial class Form1 : Form
     {
-        Color prevColor = Color.Red;
+        Color prevColor = Color.Red;// сначала красный
+
         Point prevPoint;
         Point currentPoint;
-        Shapes currentShape = Shapes.Free;
+
+        Shapes currentShape = Shapes.Free;// по умолчанию карандаш
+
         GraphicsPath gp = new GraphicsPath();
         Graphics g;
         Bitmap bmp;
+
+        Color colorOrigin;
+        Color colorFill;
+
+        public GraphicsPath gpp;
 
         public Pen pen { get; private set; }
 
@@ -29,7 +37,6 @@ namespace PaintPencil
             InitializeComponent();
             Initalization();
         }
-        
         
         private void Initalization(Bitmap tmpBmp = null)
         {
@@ -41,10 +48,18 @@ namespace PaintPencil
             pictureBox1.Image = bmp;
             g = Graphics.FromImage(pictureBox1.Image);
         }
-        
+
+        Queue<Point> q = new Queue<Point>();
+
         private void pictureBox1_MouseDown(object sender, MouseEventArgs e)
         {
             prevPoint = e.Location;
+            switch (currentShape)
+            {
+                case Shapes.Fill:
+                    F1(e.Location);
+                    break;
+            }
         }
 
         private void pictureBox1_MouseMove(object sender, MouseEventArgs e)
@@ -56,6 +71,8 @@ namespace PaintPencil
                     case Shapes.Free:
                         currentPoint = e.Location;
                         g.DrawLine(pen, prevPoint, currentPoint);
+                        //gp.AddLine(prevPoint, currentPoint);
+
                         prevPoint = currentPoint;
                         break;
                     case Shapes.Line:
@@ -66,8 +83,10 @@ namespace PaintPencil
                     case Shapes.Ellipse:
                         currentPoint = e.Location;
                         gp.Reset();
-                        gp.AddEllipse(prevPoint.X, prevPoint.Y,
-                                      currentPoint.X, currentPoint.Y);
+                        gp.AddEllipse(prevPoint.X, prevPoint.Y, 
+                                      currentPoint.X - prevPoint.X, 
+                                      currentPoint.Y - prevPoint.Y);
+
                         break;
                     case Shapes.Rectangle:
                         currentPoint = e.Location;
@@ -77,7 +96,7 @@ namespace PaintPencil
                                 new Point(currentPoint.X, currentPoint.Y),
                                 new Point(currentPoint.X, prevPoint.Y)};
                         gp.AddPolygon(pt2);
-
+                        //g.DrawPolygon(pen, pt2);
                         break;
                     case Shapes.Triangle:
                         currentPoint = e.Location;
@@ -87,6 +106,8 @@ namespace PaintPencil
                                        new Point(currentPoint.X-2*(currentPoint.X-prevPoint.X), currentPoint.Y) };
                         gp.AddPolygon(pt);
                         break;
+                    case Shapes.Fill:
+                        break;
                     default:
                         break;
                 }
@@ -95,15 +116,48 @@ namespace PaintPencil
             pictureBox1.Refresh();
         }
 
+        private void F1(Point point)
+        {
+            q.Enqueue(point);//в очередь добавляем точку
+            colorOrigin = bmp.GetPixel(point.X, point.Y);//берет цвет пикселя этой точки
+            colorFill = pen.Color;//цвет заливки это цвет ручки
+            Fill();
+        }
+        
+        private void Fill()
+        {
+            while (q.Count > 0)
+            {
+                Point curPoint = q.Dequeue();//берем ее из очереди
+                Step(curPoint.X + 1, curPoint.Y);//
+                Step(curPoint.X - 1, curPoint.Y);//
+                Step(curPoint.X, curPoint.Y + 1);//     берем точки со всех сторон
+                Step(curPoint.X, curPoint.Y - 1);//
+            }
+            pictureBox1.Refresh();
+        }
+
+        private void Step(int x, int y)
+        {
+            if (x < 0) return;
+            if (y < 0) return;
+            if (x >= bmp.Width) return;
+            if (y >= bmp.Height) return;
+            if (bmp.GetPixel(x, y) != colorOrigin) return;  
+            bmp.SetPixel(x, y, colorFill); //закрашивает этот пиксель цветом заливки
+            q.Enqueue(new Point(x, y));// добавляет в очередь эту точку
+        }
+
+
         private void pictureBox1_MouseUp(object sender, MouseEventArgs e)
         {
             g.DrawPath(pen, gp);
-            //gp.Reset();
+            gp.Reset();
         }
 
         private void openToolStripMenuItem1_Click(object sender, EventArgs e)
         {
-            /*
+            
             OpenFileDialog file = new OpenFileDialog();
             if (file.ShowDialog() == DialogResult.OK)
             {
@@ -117,9 +171,9 @@ namespace PaintPencil
                 }
             }
             Initalization(bmp);
-            */
+            
 
-            // /*
+            /*
             OpenFileDialog ofd = new OpenFileDialog();
             if (ofd.ShowDialog() == DialogResult.OK)
             {
@@ -129,7 +183,7 @@ namespace PaintPencil
                 pictureBox1.Image = cloneimage;
                 g = Graphics.FromImage(pictureBox1.Image);
             }
-            // */
+            */
         }
 
         private void saveToolStripMenuItem1_Click(object sender, EventArgs e)
@@ -201,6 +255,11 @@ namespace PaintPencil
         {
             currentShape = Shapes.Ellipse;
         }
+
+        private void Fill_Click(object sender, EventArgs e)
+        {
+            currentShape = Shapes.Fill;
+        }
     }
 
 
@@ -210,6 +269,7 @@ namespace PaintPencil
         Line,
         Ellipse,
         Rectangle,
-        Triangle
+        Triangle,
+        Fill
     }
 }
